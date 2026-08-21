@@ -2,3 +2,4 @@ gradio
 pandas
 xgboost
 openai==0.28.0
+sklearn
