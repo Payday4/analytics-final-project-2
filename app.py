@@ -16,7 +16,7 @@ xgb_model = xgb.XGBClassifier()
 xgb_model.load_model('xgb_model.json')
 
 # Hardcoded features from your notebook training
-existing_xgb_features = ['num_lab_procedures', 'num_medications', 'number_inpatient', 'time_in_hospital', 'number_diagnoses', 'number_emergency', 'discharge_disposition_id_1', 'number_outpatient', 'num_procedures', 'discharge_disposition_id_3', 'admission_source_id_7', 'discharge_disposition_id_22', 'A1Cresult_None', 'age_[50-60)', 'admission_type_id_1', 'discharge_disposition_id_11', 'discharge_disposition_id_19', 'discharge_disposition_id_20', 'age_[70-80)', 'age_[80-90)', 'discharge_disposition_id_6', 'insulin_No', 'insulin_Down', 'race_AfricanAmerican', 'race_Caucasian', 'change_Ch', 'change_No', 'diabetesMed_Yes', 'diabetesMed_No']
+existing_xgb_features = ['num_procedures', 'time_in_hospital', 'number_inpatient', 'number_outpatient', 'number_emergency', 'num_lab_procedures', 'number_diagnoses', 'num_medications', 'insulin_Up', 'insulin_Steady', 'insulin_No', 'insulin_Down', 'max_glu_serum_Norm', 'max_glu_serum_None', 'max_glu_serum_>300', 'max_glu_serum_>200', 'gender_Unknown/Invalid', 'A1Cresult_Norm', 'A1Cresult_None', 'A1Cresult_>8', 'A1Cresult_>7', 'age_[0-10)', 'age_[10-20)', 'age_[20-30)', 'age_[30-40)', 'age_[40-50)', 'age_[50-60)', 'age_[60-70)', 'age_[70-80)', 'age_[80-90)', 'age_[90-100)', 'gender_Female', 'gender_Male', 'race_Asian', 'race_Caucasian', 'race_AfricanAmerican', 'race_Hispanic', 'race_Other', 'discharge_disposition_id_1', 'discharge_disposition_id_2', 'discharge_disposition_id_3', 'discharge_disposition_id_4', 'discharge_disposition_id_5', 'discharge_disposition_id_6', 'discharge_disposition_id_7', 'discharge_disposition_id_8', 'discharge_disposition_id_9', 'discharge_disposition_id_10', 'discharge_disposition_id_13', 'discharge_disposition_id_14', 'discharge_disposition_id_16', 'discharge_disposition_id_17', 'discharge_disposition_id_18', 'discharge_disposition_id_22', 'discharge_disposition_id_23', 'discharge_disposition_id_24', 'discharge_disposition_id_25', 'discharge_disposition_id_27', 'discharge_disposition_id_28', 'change_No', 'change_Ch']
 
 # Extraction function using LLM
 def extract_features_from_notes(notes):
@@ -60,7 +60,10 @@ def extract_features_from_notes(notes):
         df_input = df_input[existing_xgb_features]
         return df_input, "Success"
     except Exception as e:
-        return None, f"Exception: {str(e)}\nRaw Response:\n{raw_response}"
+        return None, f"Exception: {str(e)}
+
+Raw Response:
+{raw_response}"
 
 # Prediction function
 def predict_risk(df_input):
@@ -79,12 +82,16 @@ def predict_risk(df_input):
         log_odds_weighted = math.log(proba_weighted / (1 - proba_weighted)) if 0 < proba_weighted < 1 else 0
         prediction = "Readmission (<30 days)" if proba_weighted >= 0.5 else "No Readmission"
 
-        result_text = f"Weighted XGBoost Prediction: {prediction}\n"
-        result_text += f"Probability: {proba_weighted:.4f}\n"
-        result_text += f"Log Odds: {log_odds_weighted:.4f}\n"
+        result_text = f"Weighted XGBoost Prediction: {prediction}
+"
+        result_text += f"Probability: {proba_weighted:.4f}
+"
+        result_text += f"Log Odds: {log_odds_weighted:.4f}
+"
         return result_text, proba_weighted
     except Exception as e:
-        return f"Prediction Error:\n{traceback.format_exc()}", None
+        return f"Prediction Error:
+{traceback.format_exc()}", None
 
 # Recommendation function using LLM
 def generate_recommendation(notes, risk_score, df_extracted=None):
@@ -110,13 +117,15 @@ def generate_recommendation(notes, risk_score, df_extracted=None):
         )
         return response['choices'][0]['message']['content'].strip()
     except Exception as e:
-        return f"Recommendation Error:\n{traceback.format_exc()}"
+        return f"Recommendation Error:
+{traceback.format_exc()}"
 
 # Gradio Interface wrapper
 def process_patient_notes(notes):
     df_extracted, extraction_status = extract_features_from_notes(notes)
     if df_extracted is None:
-        return {"error": "Extraction failed"}, f"Extraction Error Log:\n{extraction_status}", "Extraction failed."
+        return {"error": "Extraction failed"}, f"Extraction Error Log:
+{extraction_status}", "Extraction failed."
 
     prediction_results, proba = predict_risk(df_extracted)
     if proba is None:
