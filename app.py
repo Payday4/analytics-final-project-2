@@ -126,6 +126,39 @@ def process_patient_notes(notes):
 
     return extracted_dict, prediction_results, recommendations
 
+
+def calculate_financial_balance(intervention_cost, missed_readmission_cost):
+    """Calculate costs and break-even values from the notebook hold-out results."""
+    tn, fp, fn, tp = 15942, 2133, 1585, 680
+    interventions = fp + tp
+    actual_readmissions = fn + tp
+    baseline_cost = actual_readmissions * missed_readmission_cost
+    total_intervention_cost = interventions * intervention_cost
+    total_missed_cost = fn * missed_readmission_cost
+    total_model_cost = total_intervention_cost + total_missed_cost
+    savings = baseline_cost - total_model_cost
+    break_even_intervention = (tp * missed_readmission_cost) / interventions
+    break_even_readmission = (interventions * intervention_cost) / tp
+    roi = savings / total_intervention_cost if total_intervention_cost else float("nan")
+
+    return {
+        "Hold-out patients": tn + fp + fn + tp,
+        "Actual readmissions": actual_readmissions,
+        "True positives": tp,
+        "False positives": fp,
+        "False negatives": fn,
+        "True negatives": tn,
+        "Interventions": interventions,
+        "Total intervention cost": total_intervention_cost,
+        "Total missed readmission cost": total_missed_cost,
+        "Total model cost": total_model_cost,
+        "No-intervention baseline": baseline_cost,
+        "Savings vs no intervention": savings,
+        "ROI": roi,
+        "Break-even intervention cost per flagged patient": break_even_intervention,
+        "Break-even missed-readmission cost": break_even_readmission,
+    }
+
 # Build Streamlit App
 
 st.title("🏥 Diabetic Patient Readmission Risk & Recommendation")
@@ -149,11 +182,46 @@ if st.button("Process Notes & Predict"):
         notes_input
     )
 
-    st.subheader("Extracted Features")
-    st.json(extracted)
+    st.subheader("Recommendations")
+    st.write(recommendations)
 
     st.subheader("Prediction")
     st.text(prediction)
 
-    st.subheader("Recommendations")
-    st.write(recommendations)
+    st.subheader("Extracted Features")
+    st.json(extracted)
+
+st.divider()
+st.header("Hold-out Set Financial Analysis")
+st.caption("Uses the fine-tuned XGBoost confusion matrix from the notebook's 20% hold-out set.")
+
+with st.form("financial_form"):
+    intervention_cost = st.number_input(
+        "Intervention cost per flagged patient",
+        min_value=0.0,
+        value=3000.0,
+        step=100.0,
+    )
+    missed_readmission_cost = st.number_input(
+        "Cost per missed readmission",
+        min_value=0.0,
+        value=15000.0,
+        step=500.0,
+    )
+    calculate_financials = st.form_submit_button("Calculate Financials")
+
+if calculate_financials:
+    financials = calculate_financial_balance(intervention_cost, missed_readmission_cost)
+    st.subheader("Financial Results")
+    st.dataframe(
+        pd.DataFrame(
+            {"Metric": list(financials.keys()), "Value": list(financials.values())}
+        ),
+        hide_index=True,
+        use_container_width=True,
+    )
+    st.write(
+        f"At these assumptions, the maximum break-even intervention cost is "
+        f"**${financials['Break-even intervention cost per flagged patient']:,.2f}** "
+        f"per flagged patient."
+    )
