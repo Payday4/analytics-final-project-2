@@ -7,6 +7,8 @@ import json
 import math
 import re
 import traceback
+import spaces
+
 
 # Get OpenAI key from environment variables (configured in HF Space Secrets)
 openai.api_key = os.environ.get("OPENAI_API_KEY")
@@ -17,6 +19,10 @@ xgb_model.load_model('xgb_model.json')
 
 # Hardcoded features from your notebook training
 existing_xgb_features = ['num_procedures', 'time_in_hospital', 'number_inpatient', 'number_outpatient', 'number_emergency', 'num_lab_procedures', 'number_diagnoses', 'num_medications', 'insulin_Up', 'insulin_Steady', 'insulin_No', 'insulin_Down', 'max_glu_serum_Norm', 'max_glu_serum_None', 'max_glu_serum_>300', 'max_glu_serum_>200', 'gender_Unknown/Invalid', 'A1Cresult_Norm', 'A1Cresult_None', 'A1Cresult_>8', 'A1Cresult_>7', 'age_[0-10)', 'age_[10-20)', 'age_[20-30)', 'age_[30-40)', 'age_[40-50)', 'age_[50-60)', 'age_[60-70)', 'age_[70-80)', 'age_[80-90)', 'age_[90-100)', 'gender_Female', 'gender_Male', 'race_Asian', 'race_Caucasian', 'race_AfricanAmerican', 'race_Hispanic', 'race_Other', 'discharge_disposition_id_1', 'discharge_disposition_id_2', 'discharge_disposition_id_3', 'discharge_disposition_id_4', 'discharge_disposition_id_5', 'discharge_disposition_id_6', 'discharge_disposition_id_7', 'discharge_disposition_id_8', 'discharge_disposition_id_9', 'discharge_disposition_id_10', 'discharge_disposition_id_13', 'discharge_disposition_id_14', 'discharge_disposition_id_16', 'discharge_disposition_id_17', 'discharge_disposition_id_18', 'discharge_disposition_id_22', 'discharge_disposition_id_23', 'discharge_disposition_id_24', 'discharge_disposition_id_25', 'discharge_disposition_id_27', 'discharge_disposition_id_28', 'change_No', 'change_Ch']
+import gradio as gr
+import spaces
+
+@spaces.GPU
 
 # Extraction function using LLM
 def extract_features_from_notes(notes):
