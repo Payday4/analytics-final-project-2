@@ -92,11 +92,11 @@ def extract_features_from_notes(notes):
     Keys to extract: {existing_xgb_features}
 
     Important Discharge Disposition Context:
-    - ID 1: Discharged to home
+    - ID 21: location unknown Expired (deceased)
     - ID 11: Expired (deceased)
     - ID 19: Expired at home
     - ID 20: Expired in a medical facility
-    Ensure if the notes state the patient expired or is deceased, the corresponding feature (e.g., discharge_disposition_id_11) is set to 1.
+    Ensure if the notes state the patient expired or is deceased, the corresponding feature (e.g., discharge_disposition_id_11) is set to 11.
 
     Clinical Notes:
     {notes}
@@ -161,7 +161,7 @@ def generate_recommendation(notes, risk_score, df_extracted=None):
         return "Cannot generate recommendation without a valid risk score."
 
     if df_extracted is not None:
-        deceased_cols = ['discharge_disposition_id_11', 'discharge_disposition_id_19', 'discharge_disposition_id_20']
+        deceased_cols = ['discharge_disposition_id_11', 'discharge_disposition_id_19', 'discharge_disposition_id_20', 'discharge_disposition_id_21']
         for col in deceased_cols:
             if col in df_extracted.columns and df_extracted[col].iloc[0] == 1:
                 return "Patient has expired (deceased). No follow-up or readmission prevention recommendations are applicable."
