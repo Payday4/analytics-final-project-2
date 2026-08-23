@@ -193,16 +193,16 @@ def generate_recommendation(notes, risk_score, df_extracted=None):
 def process_patient_notes(notes):
     df_extracted, extraction_status = extract_features_from_notes(notes)
     if df_extracted is None:
-        return {"error": "Extraction failed"}, f"Extraction Error Log:\n{extraction_status}", "Extraction failed."
+        return {"error": "Extraction failed"}, f"Extraction Error Log:\n{extraction_status}", "Extraction failed.", None
 
     prediction_results, proba = predict_risk(df_extracted)
     if proba is None:
-        return df_extracted.to_dict(orient='records')[0], prediction_results, "Prediction failed."
+        return df_extracted.to_dict(orient='records')[0], prediction_results, "Prediction failed.", None
 
     recommendations = generate_recommendation(notes, proba, df_extracted)
     extracted_dict = df_extracted.to_dict(orient='records')[0]
 
-    return extracted_dict, prediction_results, recommendations
+    return extracted_dict, prediction_results, recommendations, proba
 
 
 def calculate_financial_balance(intervention_cost, missed_readmission_cost):
@@ -256,7 +256,7 @@ notes_input = st.text_area(
 
 if st.button("Process Notes & Predict"):
 
-    extracted, prediction, recommendations = process_patient_notes(
+    extracted, prediction, recommendations, proba = process_patient_notes(
         notes_input
     )
 
@@ -265,7 +265,8 @@ if st.button("Process Notes & Predict"):
 
     st.subheader("Prediction")
     st.text(prediction)
-    st.metric("Readmission probability", f"{proba:.2%}")
+    if proba is not None:
+        st.metric("Readmission probability", f"{proba:.2%}")
 
     st.subheader("Extracted Features")
     st.json(extracted)
