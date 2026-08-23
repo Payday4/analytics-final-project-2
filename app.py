@@ -1,4 +1,4 @@
-import gradio as gr
+import streamlit as st
 import pandas as pd
 import xgboost as xgb
 import openai
@@ -7,7 +7,6 @@ import json
 import math
 import re
 import traceback
-import spaces
 
 
 # Get OpenAI key from environment variables (configured in HF Space Secrets)
@@ -19,9 +18,6 @@ xgb_model.load_model('xgb_model.json')
 
 # Hardcoded features from your notebook training
 existing_xgb_features = ['num_procedures', 'time_in_hospital', 'number_inpatient', 'number_outpatient', 'number_emergency', 'num_lab_procedures', 'number_diagnoses', 'num_medications', 'insulin_Up', 'insulin_Steady', 'insulin_No', 'insulin_Down', 'max_glu_serum_Norm', 'max_glu_serum_None', 'max_glu_serum_>300', 'max_glu_serum_>200', 'gender_Unknown/Invalid', 'A1Cresult_Norm', 'A1Cresult_None', 'A1Cresult_>8', 'A1Cresult_>7', 'age_[0-10)', 'age_[10-20)', 'age_[20-30)', 'age_[30-40)', 'age_[40-50)', 'age_[50-60)', 'age_[60-70)', 'age_[70-80)', 'age_[80-90)', 'age_[90-100)', 'gender_Female', 'gender_Male', 'race_Asian', 'race_Caucasian', 'race_AfricanAmerican', 'race_Hispanic', 'race_Other', 'discharge_disposition_id_1', 'discharge_disposition_id_2', 'discharge_disposition_id_3', 'discharge_disposition_id_4', 'discharge_disposition_id_5', 'discharge_disposition_id_6', 'discharge_disposition_id_7', 'discharge_disposition_id_8', 'discharge_disposition_id_9', 'discharge_disposition_id_10', 'discharge_disposition_id_13', 'discharge_disposition_id_14', 'discharge_disposition_id_16', 'discharge_disposition_id_17', 'discharge_disposition_id_18', 'discharge_disposition_id_22', 'discharge_disposition_id_23', 'discharge_disposition_id_24', 'discharge_disposition_id_25', 'discharge_disposition_id_27', 'discharge_disposition_id_28', 'change_No', 'change_Ch']
-import gradio as gr
-import spaces
-
 
 def extract_features_from_notes(notes):
     prompt = f'''
@@ -115,7 +111,7 @@ def generate_recommendation(notes, risk_score, df_extracted=None):
         return response['choices'][0]['message']['content'].strip()
     except Exception as e:
         return f"Recommendation Error:\n{traceback.format_exc()}"
-@spaces.GPU
+
 def process_patient_notes(notes):
     df_extracted, extraction_status = extract_features_from_notes(notes)
     if df_extracted is None:
@@ -130,23 +126,28 @@ def process_patient_notes(notes):
 
     return extracted_dict, prediction_results, recommendations
 
-# Build Gradio App
-with gr.Blocks(title="Diabetic Patient Readmission Risk & Recommendation") as app:
-    gr.Markdown("## 🏥 Diabetic Patient Readmission Risk Predictor")
-    gr.Markdown("Enter patient notes below. The app will extract features, predict readmission risk (log odds), and provide recommendations.")
+# Build Streamlit App
+st.title("Diabetic Patient Readmission Risk & Recommendation")
+st.markdown("Enter patient notes below. The app will extract features, predict readmission risk (log odds), and provide recommendations.")
 
-    with gr.Row():
-        with gr.Column():
-            notes_input = gr.Textbox(lines=10, label="Medical Professional Notes", placeholder="E.g., 65-year-old African American patient...")
-            submit_btn = gr.Button("Process Notes & Predict")
+with st.Row():
+        with st.Column():
+            notes_input = st.Textarea(lines=10, label="Medical Professional Notes", placeholder="E.g., 65-year-old African American patient...")
+            submit_btn = st.button("Process Notes & Predict")
 
-        with gr.Column():
-            extracted_output = gr.JSON(label="Extracted Features (JSON) / Error Dict")
-            prediction_output = gr.Textbox(label="Prediction & Log Odds (Weighted XGBoost)", lines=10)
-            recommendation_output = gr.Textbox(lines=8, label="Follow-up Recommendations")
+        with st.Column():
+            extracted_output = st.json(label="Extracted Features (JSON) / Error Dict")
+            prediction_output = st.text_area(label="Prediction & Log Odds (Weighted XGBoost)", height=10)
+            recommendation_output = st.text_area(lines=8, label="Follow-up Recommendations")
 
-    submit_btn.click(fn=process_patient_notes, inputs=notes_input, outputs=[extracted_output, prediction_output, recommendation_output])
+if submit_btn:
+    extracted, prediction, recommendations = process_patient_notes(notes_input)
 
-if __name__ == "__main__":
-    app.launch(ssr_mode=False)
+    st.subheader("Extracted Features")
+    st.json(extracted)
 
+    st.subheader("Prediction")
+    st.write(prediction)
+
+    st.subheader("Recommendations")
+    st.write(recommendations)
