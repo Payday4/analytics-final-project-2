@@ -33,6 +33,18 @@ CODES_DIR = PROJECT_DIR / "Codes"
 # Load the trained model
 xgb_model = xgb.XGBClassifier()
 xgb_model.load_model('xgb_model.json')
+MODEL_FEATURES = xgb_model.get_booster().feature_names or []
+
+
+def prepare_model_input(data):
+    """Match extracted features to the exact schema stored in xgb_model.json."""
+    result = data.copy()
+    result.columns = [re.sub(r'[^a-zA-Z0-9_]', '_', str(column)) for column in result.columns]
+    for column in MODEL_FEATURES:
+        if column not in result.columns:
+            result[column] = 0
+    result = result[MODEL_FEATURES]
+    return result.apply(pd.to_numeric, errors='coerce').fillna(0)
 
 # Hardcoded features from your notebook training
 existing_xgb_features = ['num_procedures', 'time_in_hospital', 'number_inpatient', 'number_outpatient', 'number_emergency', 'num_lab_procedures', 'number_diagnoses', 'num_medications', 'insulin_Up', 'insulin_Steady', 'insulin_No', 'insulin_Down', 'max_glu_serum_Norm', 'max_glu_serum_None', 'max_glu_serum_>300', 'max_glu_serum_>200', 'gender_Unknown/Invalid', 'A1Cresult_Norm', 'A1Cresult_None', 'A1Cresult_>8', 'A1Cresult_>7', 'age_[0-10)', 'age_[10-20)', 'age_[20-30)', 'age_[30-40)', 'age_[40-50)', 'age_[50-60)', 'age_[60-70)', 'age_[70-80)', 'age_[80-90)', 'age_[90-100)', 'gender_Female', 'gender_Male', 'race_Asian', 'race_Caucasian', 'race_AfricanAmerican', 'race_Hispanic', 'race_Other', 'discharge_disposition_id_1', 'discharge_disposition_id_2', 'discharge_disposition_id_3', 'discharge_disposition_id_4', 'discharge_disposition_id_5', 'discharge_disposition_id_6', 'discharge_disposition_id_7', 'discharge_disposition_id_8', 'discharge_disposition_id_9', 'discharge_disposition_id_10', 'discharge_disposition_id_13', 'discharge_disposition_id_14', 'discharge_disposition_id_16', 'discharge_disposition_id_17', 'discharge_disposition_id_18', 'discharge_disposition_id_22', 'discharge_disposition_id_23', 'discharge_disposition_id_24', 'discharge_disposition_id_25', 'discharge_disposition_id_27', 'discharge_disposition_id_28', 'change_No', 'change_Ch']
@@ -126,7 +138,7 @@ def extract_features_from_notes(notes):
             if col not in df_input.columns:
                 df_input[col] = 0
 
-        df_input = df_input[existing_xgb_features]
+        df_input = prepare_model_input(df_input)
         return df_input, "Success"
     except Exception as e:
         return None, f"Exception: {str(e)}\n\nRaw Response:\n{raw_response}"
@@ -134,17 +146,8 @@ def extract_features_from_notes(notes):
 # Prediction function
 def predict_risk(df_input):
     try:
-        def sanitize_colnames(df):
-            cols = df.columns
-            new_cols = []
-            for col in cols:
-                new_col = re.sub(r'[^a-zA-Z0-9_]', '_', col)
-                new_cols.append(new_col)
-            df.columns = new_cols
-            return df
-
-        df_input_sanitized = sanitize_colnames(df_input.copy())
-        proba_weighted = xgb_model.predict_proba(df_input_sanitized)[0][1]
+        df_input_sanitized = prepare_model_input(df_input)
+        proba_weighted = float(xgb_model.predict_proba(df_input_sanitized)[0][1])
         log_odds_weighted = math.log(proba_weighted / (1 - proba_weighted)) if 0 < proba_weighted < 1 else 0
         prediction = "Readmission (<30 days)" if proba_weighted >= 0.5 else "No Readmission"
 
