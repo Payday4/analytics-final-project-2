@@ -60,7 +60,10 @@ def extract_features_from_notes(notes):
         df_input = df_input[existing_xgb_features]
         return df_input, "Success"
     except Exception as e:
-        return None, f"Exception: {str(e)}\nRaw Response:\n{raw_response}"
+        return None, f"Exception: {str(e)}
+
+Raw Response:
+{raw_response}"
 
 # Prediction function
 def predict_risk(df_input):
@@ -79,12 +82,16 @@ def predict_risk(df_input):
         log_odds_weighted = math.log(proba_weighted / (1 - proba_weighted)) if 0 < proba_weighted < 1 else 0
         prediction = "Readmission (<30 days)" if proba_weighted >= 0.5 else "No Readmission"
 
-        result_text = f"Weighted XGBoost Prediction: {prediction}\n"
-        result_text += f"Probability: {proba_weighted:.4f}\n"
-        result_text += f"Log Odds: {log_odds_weighted:.4f}\n"
+        result_text = f"Weighted XGBoost Prediction: {prediction}
+"
+        result_text += f"Probability: {proba_weighted:.4f}
+"
+        result_text += f"Log Odds: {log_odds_weighted:.4f}
+"
         return result_text, proba_weighted
     except Exception as e:
-        return f"Prediction Error:\n{traceback.format_exc()}", None
+        return f"Prediction Error:
+{traceback.format_exc()}", None
 
 # Recommendation function using LLM
 def generate_recommendation(notes, risk_score, df_extracted=None):
@@ -110,13 +117,15 @@ def generate_recommendation(notes, risk_score, df_extracted=None):
         )
         return response['choices'][0]['message']['content'].strip()
     except Exception as e:
-        return f"Recommendation Error:\n{traceback.format_exc()}"
+        return f"Recommendation Error:
+{traceback.format_exc()}"
 
 # Gradio Interface wrapper
 def process_patient_notes(notes):
     df_extracted, extraction_status = extract_features_from_notes(notes)
     if df_extracted is None:
-        return {"error": "Extraction failed"}, f"Extraction Error Log:\n{extraction_status}", "Extraction failed."
+        return {"error": "Extraction failed"}, f"Extraction Error Log:
+{extraction_status}", "Extraction failed."
 
     prediction_results, proba = predict_risk(df_extracted)
     if proba is None:
