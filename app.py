@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import xgboost as xgb
-import openai
+from openai import OpenAI
 import os
 import json
 import math
@@ -9,8 +9,15 @@ import re
 import traceback
 
 
-# Get OpenAI key from environment variables (configured in HF Space Secrets)
-openai.api_key = os.environ.get("OPENAI_API_KEY")
+# Get the OpenAI key from environment variables or Streamlit secrets.
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    try:
+        OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+    except (KeyError, FileNotFoundError):
+        OPENAI_API_KEY = None
+
+openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # Load the trained model
 xgb_model = xgb.XGBClassifier()
@@ -37,13 +44,16 @@ def extract_features_from_notes(notes):
     '''
     raw_response = ""
     try:
-        response = openai.ChatCompletion.create(
+        if openai_client is None:
+            raise RuntimeError("OPENAI_API_KEY is not configured.")
+
+        response = openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "system", "content": "You return strictly JSON."},
                       {"role": "user", "content": prompt}],
             temperature=0.0
         )
-        raw_response = response['choices'][0]['message']['content'].strip()
+        raw_response = response.choices[0].message.content.strip()
 
         extracted_json = re.sub(r"^```json\s*", "", raw_response)
         extracted_json = re.sub(r"^```\s*", "", extracted_json)
@@ -100,7 +110,10 @@ def generate_recommendation(notes, risk_score, df_extracted=None):
     question = f"The patient has a readmission risk score of {risk_score:.2f}. Based on their clinical notes: '{notes}', and the disparities guidelines in the PDF and diagnosis codes, what are the recommended follow-ups?"
 
     try:
-        response = openai.ChatCompletion.create(
+        if openai_client is None:
+            raise RuntimeError("OPENAI_API_KEY is not configured.")
+
+        response = openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are a helpful medical assistant providing follow-up recommendations based on patient risk and guidelines."},
@@ -108,7 +121,7 @@ def generate_recommendation(notes, risk_score, df_extracted=None):
             ],
             temperature=0.2
         )
-        return response['choices'][0]['message']['content'].strip()
+        return response.choices[0].message.content.strip()
     except Exception as e:
         return f"Recommendation Error:\n{traceback.format_exc()}"
 
