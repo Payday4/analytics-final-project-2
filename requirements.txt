@@ -1,5 +1,6 @@
 streamlit
 pandas
 xgboost
-openai==0.28.0
+openai
 scikit-learn
+numpy

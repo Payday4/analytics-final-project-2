@@ -127,25 +127,33 @@ def process_patient_notes(notes):
     return extracted_dict, prediction_results, recommendations
 
 # Build Streamlit App
-st.title("Diabetic Patient Readmission Risk & Recommendation")
-st.markdown("Enter patient notes below. The app will extract features, predict readmission risk (log odds), and provide recommendations.")
 
+st.title("🏥 Diabetic Patient Readmission Risk & Recommendation")
 
-notes_input = st.Textarea(lines=10, label="Medical Professional Notes", placeholder="E.g., 65-year-old African American patient...")
-submit_btn = st.button("Process Notes & Predict")
+st.markdown(
+    """
+    Enter patient notes below. The app will extract features,
+    predict readmission risk, and provide recommendations.
+    """
+)
 
-extracted_output = st.json(label="Extracted Features (JSON) / Error Dict")
-prediction_output = st.text_area(label="Prediction & Log Odds (Weighted XGBoost)", height=10)
-recommendation_output = st.text_area(lines=8, label="Follow-up Recommendations")
+notes_input = st.text_area(
+    "Medical Professional Notes",
+    height=250,
+    placeholder="E.g., 65-year-old African American patient..."
+)
 
-if submit_btn:
-    extracted, prediction, recommendations = process_patient_notes(notes_input)
+if st.button("Process Notes & Predict"):
+
+    extracted, prediction, recommendations = process_patient_notes(
+        notes_input
+    )
 
     st.subheader("Extracted Features")
     st.json(extracted)
 
     st.subheader("Prediction")
-    st.write(prediction)
+    st.text(prediction)
 
     st.subheader("Recommendations")
     st.write(recommendations)
