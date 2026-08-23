@@ -7,6 +7,13 @@ import json
 import math
 import re
 import traceback
+from pathlib import Path
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+try:
+    from pypdf import PdfReader
+except ImportError:
+    PdfReader = None
 
 
 # Get the OpenAI key from environment variables or Streamlit secrets.
@@ -19,12 +26,64 @@ if not OPENAI_API_KEY:
 
 openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
+PROJECT_DIR = Path(__file__).resolve().parent
+PDF_DIR = PROJECT_DIR / "PDFs"
+CODES_DIR = PROJECT_DIR / "Codes"
+
 # Load the trained model
 xgb_model = xgb.XGBClassifier()
 xgb_model.load_model('xgb_model.json')
 
 # Hardcoded features from your notebook training
 existing_xgb_features = ['num_procedures', 'time_in_hospital', 'number_inpatient', 'number_outpatient', 'number_emergency', 'num_lab_procedures', 'number_diagnoses', 'num_medications', 'insulin_Up', 'insulin_Steady', 'insulin_No', 'insulin_Down', 'max_glu_serum_Norm', 'max_glu_serum_None', 'max_glu_serum_>300', 'max_glu_serum_>200', 'gender_Unknown/Invalid', 'A1Cresult_Norm', 'A1Cresult_None', 'A1Cresult_>8', 'A1Cresult_>7', 'age_[0-10)', 'age_[10-20)', 'age_[20-30)', 'age_[30-40)', 'age_[40-50)', 'age_[50-60)', 'age_[60-70)', 'age_[70-80)', 'age_[80-90)', 'age_[90-100)', 'gender_Female', 'gender_Male', 'race_Asian', 'race_Caucasian', 'race_AfricanAmerican', 'race_Hispanic', 'race_Other', 'discharge_disposition_id_1', 'discharge_disposition_id_2', 'discharge_disposition_id_3', 'discharge_disposition_id_4', 'discharge_disposition_id_5', 'discharge_disposition_id_6', 'discharge_disposition_id_7', 'discharge_disposition_id_8', 'discharge_disposition_id_9', 'discharge_disposition_id_10', 'discharge_disposition_id_13', 'discharge_disposition_id_14', 'discharge_disposition_id_16', 'discharge_disposition_id_17', 'discharge_disposition_id_18', 'discharge_disposition_id_22', 'discharge_disposition_id_23', 'discharge_disposition_id_24', 'discharge_disposition_id_25', 'discharge_disposition_id_27', 'discharge_disposition_id_28', 'change_No', 'change_Ch']
+
+
+@st.cache_data
+def load_rag_chunks():
+    """Load local PDF and code-reference text for retrieval-augmented recommendations."""
+    documents = []
+
+    if PdfReader is not None and PDF_DIR.exists():
+        for pdf_path in sorted(PDF_DIR.glob("*.pdf")):
+            try:
+                text = "\n".join(page.extract_text() or "" for page in PdfReader(str(pdf_path)).pages)
+                if text.strip():
+                    documents.append((pdf_path.name, text))
+            except Exception:
+                continue
+
+    if CODES_DIR.exists():
+        for csv_path in sorted(CODES_DIR.glob("*.csv")):
+            try:
+                code_df = pd.read_csv(csv_path)
+                documents.append((csv_path.name, code_df.to_csv(index=False)))
+            except Exception:
+                continue
+
+    chunks = []
+    sources = []
+    for source_name, text in documents:
+        words = text.split()
+        for start in range(0, len(words), 180):
+            chunk = " ".join(words[start:start + 220]).strip()
+            if chunk:
+                chunks.append(chunk)
+                sources.append(source_name)
+    return chunks, sources
+
+
+def retrieve_rag_context(question, top_k=4):
+    chunks, sources = load_rag_chunks()
+    if not chunks:
+        return "No local PDF or code-reference context was available.", []
+
+    vectorizer = TfidfVectorizer(stop_words="english")
+    matrix = vectorizer.fit_transform(chunks)
+    question_vector = vectorizer.transform([question])
+    scores = (matrix @ question_vector.T).toarray().ravel()
+    selected = scores.argsort()[-top_k:][::-1]
+    selected = [index for index in selected if scores[index] > 0]
+    return "\n\n".join(chunks[index] for index in selected), sorted({sources[index] for index in selected})
 
 def extract_features_from_notes(notes):
     prompt = f'''
@@ -107,7 +166,8 @@ def generate_recommendation(notes, risk_score, df_extracted=None):
             if col in df_extracted.columns and df_extracted[col].iloc[0] == 1:
                 return "Patient has expired (deceased). No follow-up or readmission prevention recommendations are applicable."
 
-    question = f"The patient has a readmission risk score of {risk_score:.2f}. Based on their clinical notes: '{notes}', and the disparities guidelines in the PDF and diagnosis codes, what are the recommended follow-ups?"
+    question = f"The patient has a readmission risk score of {risk_score:.2f}. Based on their clinical notes: '{notes}', what are the recommended follow-ups?"
+    rag_context, rag_sources = retrieve_rag_context(question)
 
     try:
         if openai_client is None:
@@ -116,12 +176,14 @@ def generate_recommendation(notes, risk_score, df_extracted=None):
         response = openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a helpful medical assistant providing follow-up recommendations based on patient risk and guidelines."},
-                {"role": "user", "content": question}
+                {"role": "system", "content": "You are a helpful medical assistant. Use the supplied retrieved context to provide cautious, patient-specific follow-up recommendations. Do not invent facts or diagnoses."},
+                {"role": "user", "content": f"Retrieved context:\n{rag_context}\n\nQuestion:\n{question}"}
             ],
             temperature=0.2
         )
-        return response.choices[0].message.content.strip()
+        recommendation = response.choices[0].message.content.strip()
+        source_text = ", ".join(rag_sources) if rag_sources else "No local sources matched"
+        return f"{recommendation}\n\nSources used: {source_text}"
     except Exception as e:
         return f"Recommendation Error:\n{traceback.format_exc()}"
 
@@ -200,6 +262,7 @@ if st.button("Process Notes & Predict"):
 
     st.subheader("Prediction")
     st.text(prediction)
+    st.metric("Readmission probability", f"{proba:.2%}")
 
     st.subheader("Extracted Features")
     st.json(extracted)
