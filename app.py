@@ -22,7 +22,7 @@ existing_xgb_features = ['num_procedures', 'time_in_hospital', 'number_inpatient
 import gradio as gr
 import spaces
 
-@spaces.GPU
+
 def extract_features_from_notes(notes):
     prompt = f'''
     You are a medical data extractor. Extract the following features from the clinical notes below.
@@ -115,7 +115,7 @@ def generate_recommendation(notes, risk_score, df_extracted=None):
         return response['choices'][0]['message']['content'].strip()
     except Exception as e:
         return f"Recommendation Error:\n{traceback.format_exc()}"
-
+@spaces.GPU
 def process_patient_notes(notes):
     df_extracted, extraction_status = extract_features_from_notes(notes)
     if df_extracted is None:
